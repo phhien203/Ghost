@@ -1,0 +1,49 @@
+name: Regression Tests
+on:
+#  pull_request:
+  push:
+    branches:
+      - master
+      - 2.x
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [ 8, 10, 12 ]
+        env:
+          - db: sqlite3
+            node_env: testing
+          - db: mysql
+            node_env: testing-mysql
+    name: Node ${{ matrix.node }} - ${{ matrix.env.db }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Shutdown default MySQL
+        run: sudo service mysql stop
+        if: matrix.env.db == 'mysql'
+
+      - name: Set up MySQL
+        uses: mirromutth/mysql-action@v1.1
+        if: matrix.env.db == 'mysql'
+        with:
+          mysql version: '5.7'
+          mysql database: 'ghost_testing'
+          mysql root password: ''
+          mysql user: 'test'
+          mysql password: 'test'
+
+      - run: yarn install
+
+      - run: yarn add sqlite3 --force
+        if: matrix.env.db == 'sqlite3'
+
+      - run: yarn ci:regression
+        env:
+          DB: ${{ matrix.env.db }}
+          NODE_ENV: ${{ matrix.env.node_env }}
